@@ -185,6 +185,7 @@ export interface RequestInfo {
   id: any;
   query: URLSearchParams;
   resourceUrl: string;
+  subParts: any[];
 }
 
 /**
@@ -225,6 +226,7 @@ export interface ParsedUrl {
   id: string;             // the (optional) id of the item in the collection (e.g., `42`)
   query: URLSearchParams; // the query as an Angular `Http` client request's URLSearchParams object
   resourceUrl: string;    // the effective URL for the resource (e.g., 'http://localhost/api/customers/')
+  subParts: any[];
 }
 
 ////////////  InMemoryBackendService ///////////
@@ -324,7 +326,7 @@ export class InMemoryBackendService {
       // parse with default url parser
       this.parseUrl(req.url);
 
-    const { base, collectionName, id, query, resourceUrl } = parsed;
+    const { base, collectionName, id, query, resourceUrl, subParts } = parsed;
     const collection = this.db[collectionName];
     const reqInfo: RequestInfo = {
       req: req,
@@ -334,7 +336,8 @@ export class InMemoryBackendService {
       headers: new Headers({ 'Content-Type': 'application/json' }),
       id: this.parseId(collection, id),
       query: query,
-      resourceUrl: resourceUrl
+      resourceUrl: resourceUrl,
+      subParts: subParts
     };
 
     const reqMethodName = RequestMethod[req.method || 0].toLowerCase();
@@ -357,6 +360,7 @@ export class InMemoryBackendService {
 
     } else if (reqInfo.collection) {
       // request is for a collection created by the InMemoryDbService
+      // return this.addDelay(this.collectionHandler(reqInfo));
       return this.addDelay(this.collectionHandler(reqInfo));
 
     } else if (this.passThruBackend) {
@@ -385,6 +389,10 @@ export class InMemoryBackendService {
    * ANDs the conditions together
    */
   protected applyQuery(collection: any[], query: URLSearchParams): any[] {
+    console.log("step 1:");
+    console.log(collection);
+    console.log("step 2:");
+    console.log(query);
     // extract filtering conditions - {propertyName, RegExps) - from query/search parameters
     const conditions: { name: string, rx: RegExp }[] = [];
     const caseSensitive = this.config.caseSensitiveSearch ? undefined : 'i';
@@ -515,8 +523,23 @@ export class InMemoryBackendService {
     return maxId + 1;
   }
 
-  protected get({ id, query, collection, collectionName, headers, req }: RequestInfo) {
+  protected get({ id, query, collection, collectionName, headers, req, subParts }: RequestInfo) {
     let data = collection;
+
+    // console.log("in the module 1:");
+    // console.log(req);
+    // console.log("in the module 2:");
+    // console.log(headers);
+    // console.log("in the module 3:");
+    // console.log(collectionName);
+    // console.log("in the module 4:");
+    // console.log(collection);
+    // console.log("in the module 5:");
+    // console.log(query);
+    // console.log("in the module 6:");
+    // console.log(id);
+    // console.log("in the module 7:");
+    // console.log(subParts);
 
     // tslint:disable-next-line:triple-equals
     if (id != undefined && id !== '') {
@@ -525,6 +548,24 @@ export class InMemoryBackendService {
       data = this.applyQuery(collection, query);
     }
 
+    for (let i = 0; i < subParts.length; ++i) {
+      let subId = subParts[i]['subId'];
+      let subName = subParts[i]['subName'];
+      data = data[subName];
+      if (subId != undefined && subId !== '') {
+        data = data.filter(
+          item => item.id == subId
+        );
+        if (data.length == 0) {
+          data = [];
+        } else if (data.length == 1) {
+          data = data[0];
+        } else {
+          throw new Error("overlapping ids!");
+        }
+      }
+
+    }
     if (!data) {
       return createErrorResponse(req, STATUS.NOT_FOUND, `'${collectionName}' with id='${id}' not found`);
     }
@@ -641,9 +682,16 @@ export class InMemoryBackendService {
       collectionName = collectionName && collectionName.split('.')[0];
 
       const id = pathSegments[segmentIx++];
+
+      let subParts: any[] = [];
+      while (segmentIx < pathSegments.length) {
+        let subName = pathSegments[segmentIx++];
+        let subId = pathSegments[segmentIx++];
+        subParts.push({subName: subName, subId: subId});
+      }
       const query = loc.search && new URLSearchParams(loc.search.substr(1));
       const resourceUrl = urlRoot + apiBase + collectionName + '/';
-      return { base: apiBase, collectionName, id, query, resourceUrl };
+      return { base: apiBase, collectionName, id, query, resourceUrl, subParts};
     } catch (err) {
       const msg = `unable to parse url '${url}'; original error: ${err.message}`;
       throw new Error(msg);

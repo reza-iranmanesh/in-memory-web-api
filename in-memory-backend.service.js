@@ -209,7 +209,7 @@ export var InMemoryBackendService = (function () {
             this.inMemDbService['parseUrl'](req.url) :
             // parse with default url parser
             this.parseUrl(req.url);
-        var base = parsed.base, collectionName = parsed.collectionName, id = parsed.id, query = parsed.query, resourceUrl = parsed.resourceUrl;
+        var base = parsed.base, collectionName = parsed.collectionName, id = parsed.id, query = parsed.query, resourceUrl = parsed.resourceUrl, subParts = parsed.subParts;
         var collection = this.db[collectionName];
         var reqInfo = {
             req: req,
@@ -219,7 +219,8 @@ export var InMemoryBackendService = (function () {
             headers: new Headers({ 'Content-Type': 'application/json' }),
             id: this.parseId(collection, id),
             query: query,
-            resourceUrl: resourceUrl
+            resourceUrl: resourceUrl,
+            subParts: subParts
         };
         var reqMethodName = RequestMethod[req.method || 0].toLowerCase();
         var resOptions;
@@ -240,6 +241,7 @@ export var InMemoryBackendService = (function () {
         }
         else if (reqInfo.collection) {
             // request is for a collection created by the InMemoryDbService
+            // return this.addDelay(this.collectionHandler(reqInfo));
             return this.addDelay(this.collectionHandler(reqInfo));
         }
         else if (this.passThruBackend) {
@@ -266,6 +268,10 @@ export var InMemoryBackendService = (function () {
      * ANDs the conditions together
      */
     InMemoryBackendService.prototype.applyQuery = function (collection, query) {
+        console.log("step 1:");
+        console.log(collection);
+        console.log("step 2:");
+        console.log(query);
         // extract filtering conditions - {propertyName, RegExps) - from query/search parameters
         var conditions = [];
         var caseSensitive = this.config.caseSensitiveSearch ? undefined : 'i';
@@ -389,14 +395,48 @@ export var InMemoryBackendService = (function () {
         return maxId + 1;
     };
     InMemoryBackendService.prototype.get = function (_a) {
-        var id = _a.id, query = _a.query, collection = _a.collection, collectionName = _a.collectionName, headers = _a.headers, req = _a.req;
+        var id = _a.id, query = _a.query, collection = _a.collection, collectionName = _a.collectionName, headers = _a.headers, req = _a.req, subParts = _a.subParts;
         var data = collection;
+        // console.log("in the module 1:");
+        // console.log(req);
+        // console.log("in the module 2:");
+        // console.log(headers);
+        // console.log("in the module 3:");
+        // console.log(collectionName);
+        // console.log("in the module 4:");
+        // console.log(collection);
+        // console.log("in the module 5:");
+        // console.log(query);
+        // console.log("in the module 6:");
+        // console.log(id);
+        // console.log("in the module 7:");
+        // console.log(subParts);
         // tslint:disable-next-line:triple-equals
         if (id != undefined && id !== '') {
             data = this.findById(collection, id);
         }
         else if (query) {
             data = this.applyQuery(collection, query);
+        }
+        var _loop_1 = function(i) {
+            var subId = subParts[i]['subId'];
+            var subName = subParts[i]['subName'];
+            data = data[subName];
+            if (subId != undefined && subId !== '') {
+                data = data.filter(function (item) { return item.id == subId; });
+                if (data.length == 0) {
+                    data = [];
+                }
+                else if (data.length == 1) {
+                    data = data[0];
+                }
+                else {
+                    throw new Error("overlapping ids!");
+                }
+            }
+        };
+        for (var i = 0; i < subParts.length; ++i) {
+            _loop_1(i);
         }
         if (!data) {
             return createErrorResponse(req, STATUS.NOT_FOUND, "'" + collectionName + "' with id='" + id + "' not found");
@@ -511,9 +551,15 @@ export var InMemoryBackendService = (function () {
             // ignore anything after a '.' (e.g.,the "json" in "customers.json")
             collectionName = collectionName && collectionName.split('.')[0];
             var id = pathSegments[segmentIx++];
+            var subParts = [];
+            while (segmentIx < pathSegments.length) {
+                var subName = pathSegments[segmentIx++];
+                var subId = pathSegments[segmentIx++];
+                subParts.push({ subName: subName, subId: subId });
+            }
             var query = loc.search && new URLSearchParams(loc.search.substr(1));
             var resourceUrl = urlRoot + apiBase + collectionName + '/';
-            return { base: apiBase, collectionName: collectionName, id: id, query: query, resourceUrl: resourceUrl };
+            return { base: apiBase, collectionName: collectionName, id: id, query: query, resourceUrl: resourceUrl, subParts: subParts };
         }
         catch (err) {
             var msg = "unable to parse url '" + url + "'; original error: " + err.message;

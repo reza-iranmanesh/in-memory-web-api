@@ -123,6 +123,7 @@ export interface RequestInfo {
     id: any;
     query: URLSearchParams;
     resourceUrl: string;
+    subParts: any[];
 }
 /**
  * Provide a `responseInterceptor` method of this type in your `inMemDbService` to
@@ -149,6 +150,7 @@ export interface ParsedUrl {
     id: string;
     query: URLSearchParams;
     resourceUrl: string;
+    subParts: any[];
 }
 /**
  * Simulate the behavior of a RESTy web api
@@ -240,7 +242,7 @@ export declare class InMemoryBackendService {
     protected delete({id, collection, collectionName, headers, req}: RequestInfo): ResponseOptions;
     protected findById(collection: any[], id: number | string): any;
     protected genId(collection: any): any;
-    protected get({id, query, collection, collectionName, headers, req}: RequestInfo): ResponseOptions;
+    protected get({id, query, collection, collectionName, headers, req, subParts}: RequestInfo): ResponseOptions;
     protected getLocation(href: string): {
         host: any;
         protocol: any;

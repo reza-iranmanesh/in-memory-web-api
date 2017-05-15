@@ -52,7 +52,8 @@ export class HeroDataOverrideService extends HeroDataService {
       [collectionName] = collectionName.split('.'); // ignore anything after the '.', e.g., '.json'
       const query = loc.search && new URLSearchParams(loc.search.substr(1));
 
-      const result = { base, collectionName, id, query, resourceUrl };
+      let subParts: any[] = [];
+      const result = { base, collectionName, id, query, resourceUrl, subParts};
       console.log('override parseUrl:');
       console.log(result);
       return result;
