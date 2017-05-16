@@ -698,7 +698,7 @@ export class InMemoryBackendService {
     }
   }
 
-  protected post({ collection, /* collectionName, */ headers, id, req, resourceUrl }: RequestInfo) {
+  protected post({ collection, /* collectionName, */ headers, id, req, resourceUrl, subParts }: RequestInfo) {
     const item = JSON.parse(<string>req.text());
     // tslint:disable-next-line:triple-equals
     if (item.id == undefined) {
