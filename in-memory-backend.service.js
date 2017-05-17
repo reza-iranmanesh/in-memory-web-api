@@ -418,6 +418,17 @@ export var InMemoryBackendService = (function () {
         else if (query) {
             data = this.applyQuery(collection, query);
         }
+        data = this.getDeepStructure(data, subParts);
+        if (!data) {
+            return createErrorResponse(req, STATUS.NOT_FOUND, "'" + collectionName + "' with id='" + id + "' not found");
+        }
+        return new ResponseOptions({
+            body: { data: this.clone(data) },
+            headers: headers,
+            status: STATUS.OK
+        });
+    };
+    InMemoryBackendService.prototype.getDeepStructure = function (data, subParts) {
         var _loop_1 = function(i) {
             var subId = subParts[i]['subId'];
             var subName = subParts[i]['subName'];
@@ -438,14 +449,7 @@ export var InMemoryBackendService = (function () {
         for (var i = 0; i < subParts.length; ++i) {
             _loop_1(i);
         }
-        if (!data) {
-            return createErrorResponse(req, STATUS.NOT_FOUND, "'" + collectionName + "' with id='" + id + "' not found");
-        }
-        return new ResponseOptions({
-            body: { data: this.clone(data) },
-            headers: headers,
-            status: STATUS.OK
-        });
+        return data;
     };
     InMemoryBackendService.prototype.getLocation = function (href) {
         if (!href.startsWith('http')) {
@@ -481,7 +485,10 @@ export var InMemoryBackendService = (function () {
         return uri;
     };
     InMemoryBackendService.prototype.indexOf = function (collection, id) {
-        return collection.findIndex(function (item) { return item.id === id; });
+        console.log('trying to find ....................................');
+        console.log(collection);
+        console.log(id);
+        return collection.findIndex(function (item) { return item.id == id; });
     };
     // tries to parse id as number if collection item.id is a number.
     // returns the original param id otherwise.
@@ -567,7 +574,12 @@ export var InMemoryBackendService = (function () {
         }
     };
     InMemoryBackendService.prototype.post = function (_a) {
-        var collection = _a.collection, headers = _a.headers, id = _a.id, req = _a.req, resourceUrl = _a.resourceUrl;
+        var collection = _a.collection, headers = _a.headers, id = _a.id, req = _a.req, resourceUrl = _a.resourceUrl, subParts = _a.subParts;
+        console.log('***************************************************************xxxxxxxxxxx*************hello');
+        console.log(req);
+        console.log(collection);
+        console.log('zzzzzzzzzzzzz1zzzzzzzzzzzz');
+        console.log(subParts);
         var item = JSON.parse(req.text());
         // tslint:disable-next-line:triple-equals
         if (item.id == undefined) {
@@ -576,10 +588,17 @@ export var InMemoryBackendService = (function () {
         // ignore the request id, if any. Alternatively,
         // could reject request if id differs from item.id
         id = item.id;
+        console.log(id);
         var existingIx = this.indexOf(collection, id);
+        var allIndexes = this.getAllIndexes(collection, existingIx, subParts);
+        collection = allIndexes[0];
+        existingIx = allIndexes[1];
         var body = { data: this.clone(item) };
         if (existingIx > -1) {
-            collection[existingIx] = item;
+            collection[existingIx] = item.data;
+            console.log('ooooooooooooooooooooooooooooooooooooooooooooo');
+            console.log(item.data);
+            console.log(collection);
             var res = this.config.post204 ?
                 { headers: headers, status: STATUS.NO_CONTENT } :
                 { headers: headers, body: body, status: STATUS.OK }; // successful; return entity
@@ -590,6 +609,31 @@ export var InMemoryBackendService = (function () {
             headers.set('Location', resourceUrl + '/' + id);
             return new ResponseOptions({ headers: headers, body: body, status: STATUS.CREATED });
         }
+    };
+    InMemoryBackendService.prototype.getAllIndexes = function (collection, existingIx, subParts) {
+        var allIndexes = [existingIx];
+        var data = collection;
+        for (var i = 0; i < subParts.length; ++i) {
+            var latestIx = allIndexes[allIndexes.length - 1];
+            var subId = subParts[i]['subId'];
+            var subName = subParts[i]['subName'];
+            console.log('xxxxxxxxxxxxxxxxxxxxxxxxxx1xxxxxxxxxxxxxxxxxxxxxxxxx');
+            console.log(data);
+            console.log(latestIx);
+            if (latestIx < 0) {
+                throw new Error("going to the deep structure of a non-existent parent");
+            }
+            if (!(subName in data[latestIx])) {
+                data[latestIx][subName] = [];
+            }
+            else {
+                data = data[latestIx][subName];
+            }
+            var existingIx_1 = this.indexOf(data, subId);
+            console.log('found id is:' + existingIx_1);
+            allIndexes.push(existingIx_1);
+        }
+        return [data, allIndexes[allIndexes.length - 1]];
     };
     InMemoryBackendService.prototype.put = function (_a) {
         var id = _a.id, collection = _a.collection, collectionName = _a.collectionName, headers = _a.headers, req = _a.req;

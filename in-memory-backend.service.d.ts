@@ -243,6 +243,7 @@ export declare class InMemoryBackendService {
     protected findById(collection: any[], id: number | string): any;
     protected genId(collection: any): any;
     protected get({id, query, collection, collectionName, headers, req, subParts}: RequestInfo): ResponseOptions;
+    private getDeepStructure(data, subParts);
     protected getLocation(href: string): {
         host: any;
         protocol: any;
@@ -273,7 +274,8 @@ export declare class InMemoryBackendService {
      * To replace this default method, assign your alternative to your InMemDbService['parseUrl']
      */
     protected parseUrl(url: string): ParsedUrl;
-    protected post({collection, headers, id, req, resourceUrl}: RequestInfo): ResponseOptions;
+    protected post({collection, headers, id, req, resourceUrl, subParts}: RequestInfo): ResponseOptions;
+    protected getAllIndexes(collection: any, existingIx: number, subParts: any): any[];
     protected put({id, collection, collectionName, headers, req}: RequestInfo): ResponseOptions;
     protected removeById(collection: any[], id: number): boolean;
     /**

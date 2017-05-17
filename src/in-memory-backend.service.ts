@@ -548,13 +548,26 @@ export class InMemoryBackendService {
       data = this.applyQuery(collection, query);
     }
 
+    data = this.getDeepStructure(data, subParts);
+
+    if (!data) {
+      return createErrorResponse(req, STATUS.NOT_FOUND, `'${collectionName}' with id='${id}' not found`);
+    }
+    return new ResponseOptions({
+      body: { data: this.clone(data) },
+      headers: headers,
+      status: STATUS.OK
+    });
+  }
+
+  private getDeepStructure(data: any, subParts: any) {
     for (let i = 0; i < subParts.length; ++i) {
       let subId = subParts[i]['subId'];
       let subName = subParts[i]['subName'];
       data = data[subName];
       if (subId != undefined && subId !== '') {
         data = data.filter(
-          item => item.id == subId
+          (item: any) => item.id == subId
         );
         if (data.length == 0) {
           data = [];
@@ -564,16 +577,9 @@ export class InMemoryBackendService {
           throw new Error("overlapping ids!");
         }
       }
+    }
+    return data;
 
-    }
-    if (!data) {
-      return createErrorResponse(req, STATUS.NOT_FOUND, `'${collectionName}' with id='${id}' not found`);
-    }
-    return new ResponseOptions({
-      body: { data: this.clone(data) },
-      headers: headers,
-      status: STATUS.OK
-    });
   }
 
   protected getLocation(href: string) {
@@ -611,7 +617,10 @@ export class InMemoryBackendService {
   }
 
   protected indexOf(collection: any[], id: number) {
-    return collection.findIndex((item: any) => item.id === id);
+    console.log('trying to find ....................................');
+    console.log(collection);
+    console.log(id);
+    return collection.findIndex((item: any) => item.id == id);
   }
 
   // tries to parse id as number if collection item.id is a number.
@@ -699,6 +708,11 @@ export class InMemoryBackendService {
   }
 
   protected post({ collection, /* collectionName, */ headers, id, req, resourceUrl, subParts }: RequestInfo) {
+    console.log('***************************************************************xxxxxxxxxxx*************hello');
+    console.log(req);
+    console.log(collection);
+    console.log('zzzzzzzzzzzzz1zzzzzzzzzzzz');
+    console.log(subParts);
     const item = JSON.parse(<string>req.text());
     // tslint:disable-next-line:triple-equals
     if (item.id == undefined) {
@@ -707,11 +721,20 @@ export class InMemoryBackendService {
     // ignore the request id, if any. Alternatively,
     // could reject request if id differs from item.id
     id = item.id;
-    const existingIx = this.indexOf(collection, id);
+    console.log(id);
+    let existingIx = this.indexOf(collection, id);
+
+    let allIndexes = this.getAllIndexes(collection, existingIx, subParts);
+    collection = allIndexes[0];
+    existingIx = allIndexes[1];
+
     const body = { data: this.clone(item) };
 
     if (existingIx > -1) {
-      collection[existingIx] = item;
+      collection[existingIx] = item.data;
+      console.log('ooooooooooooooooooooooooooooooooooooooooooooo');
+      console.log(item.data);
+      console.log(collection);
       const res =
         this.config.post204 ?
           { headers, status: STATUS.NO_CONTENT } : // successful; no content
@@ -722,6 +745,33 @@ export class InMemoryBackendService {
       headers.set('Location', resourceUrl + '/' + id);
       return new ResponseOptions({ headers, body, status: STATUS.CREATED });
     }
+  }
+
+  protected getAllIndexes(collection: any, existingIx: number, subParts: any) {
+    let allIndexes = [existingIx];
+
+    let data = collection;
+    for (let i = 0; i < subParts.length; ++i) {
+      let latestIx = allIndexes[allIndexes.length - 1];
+      let subId = subParts[i]['subId'];
+      let subName = subParts[i]['subName'];
+      console.log('xxxxxxxxxxxxxxxxxxxxxxxxxx1xxxxxxxxxxxxxxxxxxxxxxxxx');
+      console.log(data);
+      console.log(latestIx);
+      if (latestIx < 0) {
+        throw new Error("going to the deep structure of a non-existent parent");
+      }
+
+      if (! (subName in data[latestIx])) {
+        data[latestIx][subName] = [];
+      } else {
+        data = data[latestIx][subName];
+      }
+      const existingIx = this.indexOf(data, subId);
+      console.log('found id is:' + existingIx);
+      allIndexes.push(existingIx);
+    }
+    return [data, allIndexes[allIndexes.length - 1]];
   }
 
   protected put({ id, collection, collectionName, headers, req }: RequestInfo) {
